@@ -1,10 +1,7 @@
 #include <bits/stdc++.h>
 #include <ncurses.h>
-#include <unistd.h> // isatty
-
+#include <unistd.h>
 using namespace std;
-
-// forward declarations for symbols defined later in this file
 extern int n, m;
 extern vector<string> grid;
 void read_input_stream(istream &in);
@@ -15,9 +12,6 @@ pair<int,int> find_start();
 extern int dx[];
 extern int dy[];
 extern vector<vector<int>> monsterDist;
-
-// ---------- ncurses TUI editor + play mode ----------
-// Render grid to a ncurses window with colors and a cursor
 void render_tui_grid(WINDOW* win, const vector<string>& g, pair<int,int> cursor, const set<pair<int,int>>& mons, pair<int,int> player) {
     int rows = g.size();
     int cols = rows?g[0].size():0;
@@ -44,15 +38,11 @@ void render_tui_grid(WINDOW* win, const vector<string>& g, pair<int,int> cursor,
     }
     wrefresh(win);
 }
-
-// Render play state: monsters appear when monsterDist <= t, optionally show path
 void render_tui_play(WINDOW* win, const vector<string>& g, const vector<vector<int>>& monsterDist, int t, const vector<pair<int,int>>& pathCells, pair<int,int> player, bool showPath) {
     int rows = g.size();
     int cols = rows?g[0].size():0;
     werase(win);
     box(win, 0, 0);
-    
-    // First pass: draw background and walls
     for (int i=0;i<rows;i++){
         for (int j=0;j<cols;j++){
             int wy = 1 + i, wx = 1 + j;
@@ -66,8 +56,6 @@ void render_tui_play(WINDOW* win, const vector<string>& g, const vector<vector<i
             }
         }
     }
-    
-    // Second pass: draw escape path
     if (showPath) {
         for (size_t idx = 0; idx < pathCells.size(); idx++) {
             int i = pathCells[idx].first;
@@ -81,8 +69,6 @@ void render_tui_play(WINDOW* win, const vector<string>& g, const vector<vector<i
             }
         }
     }
-    
-    // Third pass: draw monsters and their spread
     for (int i=0;i<rows;i++){
         for (int j=0;j<cols;j++){
             int wy = 1 + i, wx = 1 + j;
@@ -98,16 +84,12 @@ void render_tui_play(WINDOW* win, const vector<string>& g, const vector<vector<i
             }
         }
     }
-    
-    // Finally: draw player with highlight
     if (player.first != -1) {
         int wy = 1 + player.first;
         int wx = 1 + player.second;
         wattron(win, COLOR_PAIR(6) | A_BOLD);
         mvwaddch(win, wy, wx, '@');
         wattroff(win, COLOR_PAIR(6) | A_BOLD);
-        
-        // Add highlight effect around player
         for (int dy = -1; dy <= 1; dy++) {
             for (int dx = -1; dx <= 1; dx++) {
                 if (dy == 0 && dx == 0) continue;
@@ -126,15 +108,11 @@ void render_tui_play(WINDOW* win, const vector<string>& g, const vector<vector<i
     
     wrefresh(win);
 }
-
-// Render play state with explicit monster set (showing spreading monsters)
 void render_tui_play_dynamic(WINDOW* win, const vector<string>& g, const set<pair<int,int>>& monsters, int t, const vector<pair<int,int>>& pathCells, pair<int,int> player, bool showPath) {
     int rows = g.size();
     int cols = rows?g[0].size():0;
     werase(win);
     box(win, 0, 0);
-
-    // background
     for (int i=0;i<rows;i++){
         for (int j=0;j<cols;j++){
             int wy = 1 + i, wx = 1 + j;
@@ -146,8 +124,6 @@ void render_tui_play_dynamic(WINDOW* win, const vector<string>& g, const set<pai
             }
         }
     }
-
-    // draw path
     if (showPath) {
         for (auto &pc : pathCells) {
             int i = pc.first, j = pc.second;
@@ -156,25 +132,17 @@ void render_tui_play_dynamic(WINDOW* win, const vector<string>& g, const set<pai
             wattron(win, COLOR_PAIR(6)); mvwaddch(win, wy, wx, '*'); wattroff(win, COLOR_PAIR(6));
         }
     }
-
-    // draw monsters
     for (auto &mp : monsters) {
         int wy = 1 + mp.first, wx = 1 + mp.second;
         wattron(win, COLOR_PAIR(2) | A_BOLD); mvwaddch(win, wy, wx, 'M'); wattroff(win, COLOR_PAIR(2) | A_BOLD);
     }
-
-    // draw player
     if (player.first != -1) {
         int wy = 1 + player.first, wx = 1 + player.second;
         wattron(win, COLOR_PAIR(6) | A_BOLD); mvwaddch(win, wy, wx, '@'); wattroff(win, COLOR_PAIR(6) | A_BOLD);
     }
-
     wrefresh(win);
 }
-
-// TUI game loop: editor with panels then play where monsters spread each turn
 int tui_game_loop(const string &infile) {
-    // load initial grid or create default
     int rows = 12, cols = 30;
     vector<string> localGrid;
     set<pair<int,int>> monsters;
@@ -191,11 +159,8 @@ int tui_game_loop(const string &infile) {
         }
     }
     if (localGrid.empty()) localGrid.assign(rows, string(cols, '.'));
-
-    // init ncurses
     initscr(); cbreak(); noecho(); keypad(stdscr, TRUE); curs_set(0);
     if (has_colors()) { start_color(); use_default_colors(); init_pair(1, COLOR_WHITE, -1); init_pair(2, COLOR_RED, -1); init_pair(3, COLOR_CYAN, -1); init_pair(4, COLOR_YELLOW, -1); init_pair(6, COLOR_GREEN, -1); }
-
     int win_h = rows + 2, win_w = cols + 2;
     int side_w = 32;
     int scr_h, scr_w; getmaxyx(stdscr, scr_h, scr_w);
@@ -203,14 +168,10 @@ int tui_game_loop(const string &infile) {
     WINDOW* gridWin = newwin(win_h, win_w, gy, gx);
     WINDOW* sideWin = newwin(win_h, side_w, gy, gx + win_w);
     box(sideWin, 0, 0);
-
     pair<int,int> cursor = {0,0};
     bool running = true;
     int ch;
-
-    // editor loop
     while (running) {
-        // render side panel
         werase(sideWin); box(sideWin, 0, 0);
         mvwprintw(sideWin, 1, 2, "PathFinder++ ");
         mvwprintw(sideWin, 3, 2, "Arrows: move cursor");
@@ -224,9 +185,7 @@ int tui_game_loop(const string &infile) {
         if (player.first!=-1) mvwprintw(sideWin, 12, 2, "Player: %d,%d", player.first, player.second);
         mvwprintw(sideWin, win_h-2, 2, "Monsters: %zu", monsters.size());
         wrefresh(sideWin);
-
         render_tui_grid(gridWin, localGrid, cursor, monsters, player);
-
         ch = wgetch(stdscr);
         if (ch == KEY_UP) { cursor.first = max(0, cursor.first-1); }
         else if (ch == KEY_DOWN) { cursor.first = min(rows-1, cursor.first+1); }
@@ -236,7 +195,6 @@ int tui_game_loop(const string &infile) {
         else if (ch == 'm') { int r=cursor.first, c=cursor.second; if (monsters.find({r,c})!=monsters.end()) monsters.erase({r,c}); else monsters.insert({r,c}); localGrid[r][c]='.'; }
         else if (ch == 'a') { player = cursor; }
         else if (ch == 's') {
-            // save simple format
             echo(); nocbreak(); mvwprintw(sideWin, win_h-3, 2, "Save file: "); wrefresh(sideWin);
             char fname[256]; mvwgetnstr(sideWin, win_h-3, 14, fname, 255);
             ofstream out(fname);
@@ -265,7 +223,6 @@ int tui_game_loop(const string &infile) {
             noecho(); cbreak();
         }
         else if (ch == 'p') {
-            // start play mode (animated multisource BFS + player path)
             n = rows; m = cols; grid = localGrid;
             pair<int,int> startPos = player;
             if (startPos.first == -1) startPos = find_start();
@@ -273,8 +230,6 @@ int tui_game_loop(const string &infile) {
                 grid[startPos.first][startPos.second] = 'A';
             }
             compute_monster_dist();
-            
-            // CORRECTED: Check if start position is safe at time 0
             if (startPos.first != -1 && monsterDist[startPos.first][startPos.second] == 0) {
                 werase(sideWin); box(sideWin,0,0);
                 wattron(sideWin, COLOR_PAIR(2) | A_BOLD);
@@ -288,8 +243,6 @@ int tui_game_loop(const string &infile) {
                 nodelay(stdscr, TRUE);
                 continue;
             }
-            
-            // compute safe path (if exists)
             auto safePath = find_safe_path();
             vector<pair<int,int>> pathCells;
             if (!safePath.empty()){
@@ -305,8 +258,6 @@ int tui_game_loop(const string &infile) {
                     x += dx[dir]; y += dy[dir];
                     pathCells.emplace_back(x,y);
                 }
-                
-                // Validate path
                 bool valid = true;
                 for (size_t i = 0; i < pathCells.size(); ++i) {
                     int arrive = (int)i + 1;
@@ -325,8 +276,6 @@ int tui_game_loop(const string &infile) {
                     safePath.clear();
                 }
             }
-
-            // CORRECTED: Use spreading monsters (consistent with algorithm)
             set<pair<int,int>> playMonsters = monsters;
             vector<vector<int>> md = monsterDist;
             bool playRunning = true; bool paused = false; bool showPath = true;
@@ -335,7 +284,6 @@ int tui_game_loop(const string &infile) {
             pair<int,int> ppos = (player.first==-1? find_start() : player);
             size_t escapeStep = 0;
             nodelay(stdscr, TRUE);
-            
             if (!pathCells.empty()) {
                 werase(sideWin); box(sideWin,0,0);
                 wattron(sideWin, COLOR_PAIR(6) | A_BOLD);
@@ -343,13 +291,11 @@ int tui_game_loop(const string &infile) {
                 wattroff(sideWin, COLOR_PAIR(6) | A_BOLD);
                 mvwprintw(sideWin, 6, 2, "Press SPACE to start");
                 wrefresh(sideWin);
-                render_tui_play(gridWin, localGrid, md, t, pathCells, ppos, true);
-                
+                render_tui_play(gridWin, localGrid, md, t, pathCells, ppos, true);   
                 nodelay(stdscr, FALSE);
                 while (wgetch(stdscr) != ' ');
                 nodelay(stdscr, TRUE);
             }
-            
             while (playRunning) {
                 werase(sideWin); box(sideWin,0,0);
                 mvwprintw(sideWin,1,2,"Playing — space pause, q quit");
@@ -380,13 +326,9 @@ int tui_game_loop(const string &infile) {
                 else if (k == '+') speed_ms = max(10, speed_ms - 20);
                 else if (k == '-') speed_ms = min(2000, speed_ms + 20);
                 else if (k == 's') showPath = !showPath;
-
                 if (!paused) {
-                    // CORRECTED ORDER: Monsters spread first
                     playMonsters = spread_monsters(localGrid, playMonsters);
                     t++;
-                    
-                    // CORRECTED: Check if caught BEFORE moving
                     if (playMonsters.find(ppos) != playMonsters.end()) {
                         render_tui_play_dynamic(gridWin, localGrid, playMonsters, t, pathCells, ppos, showPath);
                         werase(sideWin); box(sideWin,0,0);
@@ -401,14 +343,11 @@ int tui_game_loop(const string &infile) {
                         playRunning = false;
                         continue;
                     }
-                    
-                    // Now move player
-                    if (!pathCells.empty() && escapeStep < pathCells.size()) {
+                    if (!pathCells.empty() && escapeStep < pathCells.size()) 
+                    {
                         ppos = pathCells[escapeStep];
                         escapeStep++;
                     }
-                    
-                    // CORRECTED: Check caught BEFORE checking win
                     if (playMonsters.find(ppos) != playMonsters.end()) {
                         render_tui_play_dynamic(gridWin, localGrid, playMonsters, t, pathCells, ppos, showPath);
                         werase(sideWin); box(sideWin,0,0);
@@ -423,8 +362,6 @@ int tui_game_loop(const string &infile) {
                         playRunning = false;
                         continue;
                     }
-                    
-                    // Check win condition
                     if (ppos.first==rows-1 && ppos.second==cols-1) {
                         render_tui_play_dynamic(gridWin, localGrid, playMonsters, t, pathCells, ppos, showPath);
                         werase(sideWin);
@@ -456,10 +393,6 @@ int tui_game_loop(const string &infile) {
     endwin();
     return 0;
 }
-
-
-// CLI-only interactive game: place walls, monsters and player, then try to escape while monsters spread each turn.
-
 void render_ascii_state(const vector<string>& grid, pair<int,int> playerPos, const set<pair<int,int>>& monsters, int step) {
     cout << "\033[H\033[J";
     cout << "Step: " << step << "\n";
@@ -475,8 +408,6 @@ void render_ascii_state(const vector<string>& grid, pair<int,int> playerPos, con
     }
     cout << "Commands: w/a/s/d to move, q to quit\n";
 }
-
-// CORRECTED: Spread monsters like fire (consistent with algorithm)
 set<pair<int,int>> spread_monsters(const vector<string>& grid, const set<pair<int,int>>& monsters) {
     set<pair<int,int>> next = monsters;
     int n = grid.size();
@@ -493,8 +424,6 @@ set<pair<int,int>> spread_monsters(const vector<string>& grid, const set<pair<in
     }
     return next;
 }
-
-// Interactive editor and play loop for CLI game
 int cli_game_loop(string infile) {
     int rows = 10, cols = 20;
     vector<string> localGrid;
@@ -599,27 +528,20 @@ int cli_game_loop(string infile) {
             
             while (running) {
                 render_ascii_state(localGrid, ppos, mons, step);
-                
-                // CORRECTED: Check caught BEFORE checking win
                 if (mons.find(ppos) != mons.end()) {
                     cout << "You were caught!\n";
                     running = false;
                     break;
                 }
-                
-                // Check win
                 if (ppos.first==rows-1 && ppos.second==cols-1) {
                     cout << "You escaped!\n";
                     running = false;
                     break;
                 }
-                
-                // Read player input
                 string mv;
                 if (!getline(cin, mv)) return 0;
                 
                 if (mv.empty()) {
-                    // Wait - do nothing this turn
                 } else if (mv=="q") {
                     return 0;
                 } else if (mv=="w") {
@@ -638,12 +560,8 @@ int cli_game_loop(string infile) {
                     cout << "w/a/s/d=move, Enter=wait, q=quit\n";
                     continue;
                 }
-                
-                // CORRECTED: Monsters spread after player moves
                 mons = spread_monsters(localGrid, mons);
                 step++;
-                
-                // CORRECTED: Check if caught after spreading
                 if (mons.find(ppos) != mons.end()) {
                     render_ascii_state(localGrid, ppos, mons, step);
                     cout << "You were caught!\n";
@@ -661,19 +579,15 @@ int cli_game_loop(string infile) {
     }
     return 0;
 }
-
 using namespace std;
-
 const int INF = 1e9;
 int n, m;
 vector<string> grid;
 vector<vector<int>> monsterDist;
 vector<vector<int>> playerDist;
-
 int dx[4] = {1,-1,0,0};
 int dy[4] = {0,0,1,-1};
 char dch[4] = {'D','U','R','L'};
-
 void read_input_stream(istream &in) {
     in >> n >> m;
     string line;
@@ -723,11 +637,9 @@ void compute_monster_dist() {
     }
 }
 
-// BFS for player constrained by monster times
 vector<char> find_safe_path() {
     auto start = find_start();
     if (start.first == -1) return {};
-    // CORRECTED: Check if start is safe at time 0
     if (monsterDist[start.first][start.second] == 0) return {};
     
     playerDist.assign(n, vector<int>(m, INF));
@@ -741,8 +653,6 @@ vector<char> find_safe_path() {
     while (!q.empty()) {
         auto cur = q.front(); q.pop();
         int cx = cur.first, cy = cur.second;
-        
-        // Check if we reached the exit (bottom-right)
         pair<int,int> target = {n-1, m-1};
         if (cx == target.first && cy == target.second) {
             escape = cur;
@@ -754,8 +664,6 @@ vector<char> find_safe_path() {
             if (nx<0||nx>=n||ny<0||ny>=m) continue;
             if (grid[nx][ny] == '#') continue;
             int arrive = playerDist[cx][cy] + 1;
-            
-            // CORRECTED: Player must arrive BEFORE monsters (strict inequality)
             if (arrive < monsterDist[nx][ny] && playerDist[nx][ny] == INF) {
                 playerDist[nx][ny] = arrive;
                 parent[nx][ny] = {cx,cy};
@@ -766,8 +674,6 @@ vector<char> find_safe_path() {
     }
     
     if (escape.first == -1) return {};
-    
-    // Reconstruct path
     vector<char> path;
     pair<int,int> cur = escape;
     while (!(cur.first == start.first && cur.second == start.second)) {
@@ -779,7 +685,6 @@ vector<char> find_safe_path() {
     return path;
 }
 
-// Simple ncurses renderer
 void render_ncurses(int t, pair<int,int> playerPos, const vector<pair<int,int>>& pathCells, bool showPath) {
     int rows, cols;
     getmaxyx(stdscr, rows, cols);
@@ -831,8 +736,6 @@ int main(int argc, char** argv) {
     if (tui) {
         return tui_game_loop(infile);
     }
-    
-    // Interactive menu if no input file and terminal is interactive
     if (infile.empty() && isatty(fileno(stdin))) {
         while (true) {
             cout << "\nPathFinder++ — Menu\n";
@@ -952,8 +855,6 @@ int main(int argc, char** argv) {
                         this_thread::sleep_for(chrono::milliseconds(speed_ms));
                         t++;
                         if ((int)pathCells.size() >= t) playerPos = pathCells[t-1];
-                        
-                        // CORRECTED: Check caught before win
                         if (monsterDist[playerPos.first][playerPos.second] <= t) {
                             print_ascii(t, playerPos, showPath);
                             cout << "Caught!\n";
@@ -1007,8 +908,6 @@ int main(int argc, char** argv) {
     }
 
     if (!playMode) return 0;
-
-    // Prepare path cells
     vector<pair<int,int>> pathCells;
     if (!path.empty()){
         auto start = find_start();
@@ -1023,8 +922,6 @@ int main(int argc, char** argv) {
             pathCells.push_back({x,y});
         }
     }
-
-    // Init ncurses
     initscr();
     cbreak();
     noecho();
@@ -1047,9 +944,7 @@ int main(int argc, char** argv) {
     auto start = find_start();
     pair<int,int> playerPos = start;
     bool showPath = true;
-
     render_ncurses(t, playerPos, pathCells, showPath);
-
     while (true) {
         int ch = getch();
         if (ch != ERR) {
@@ -1060,7 +955,6 @@ int main(int argc, char** argv) {
             if (ch == '+') speed_ms = max(10, speed_ms - 20);
             if (ch == '-') speed_ms = min(2000, speed_ms + 20);
             
-            // Manual control
             if (ch == KEY_UP || ch=='w') {
                 int nx = playerPos.first-1, ny = playerPos.second;
                 if (nx>=0 && grid[nx][ny]!='#') playerPos = {nx,ny};
@@ -1078,17 +972,13 @@ int main(int argc, char** argv) {
                 if (ny<m && grid[nx][ny]!='#') playerPos = {nx,ny};
             }
         }
-        
         if (!paused) {
             t++;
             if (!path.empty() && (int)pathCells.size() >= t) {
                 playerPos = pathCells[t-1];
             }
-        }
-        
+        }   
         render_ncurses(t, playerPos, pathCells, showPath);
-        
-        // CORRECTED: Check caught before win
         if (monsterDist[playerPos.first][playerPos.second] <= t) {
             mvprintw(n+2, 0, "Caught! Press q to quit.");
             refresh();
@@ -1100,10 +990,8 @@ int main(int argc, char** argv) {
             refresh();
             paused = true;
         }
-        
         this_thread::sleep_for(chrono::milliseconds(speed_ms));
     }
-
     endwin();
     return 0;
 }
